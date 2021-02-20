@@ -193,6 +193,8 @@ void ScreenInteractive::PostEvent(Event event) {
     event_sender_->Send(event);
 }
 
+std::string previous_string;
+
 void ScreenInteractive::Loop(Component* component) {
   // Install a SIGINT handler and restore the old handler on exit.
   auto old_sigint_handler = std::signal(SIGINT, OnExit);
@@ -269,12 +271,48 @@ void ScreenInteractive::Loop(Component* component) {
     on_exit_functions.push([] { std::cout << USE_NORMAL_SCREEN; });
   }
 
-  // The main loop.
+  // The main loop
+  // MODS in this loop by Aleksi Leino: Quick and dirty tests to reduce blinking in WSL terminals
+
   while (!quit_) {
     if (!event_receiver_->HasPending()) {
       std::cout << reset_cursor_position << ResetPosition();
       Draw(component);
-      std::cout << ToString() << set_cursor_position << std::flush;
+
+      std::string fixed_string;
+      
+      if(previous_string.length() > 0) {
+        std::string current_string = ToString();
+        int skip_length = 0;
+        for(int i = 0; i< current_string.length(); i++) {
+          // replace the characters that are same as previous with a command that moves the cursor forward
+          
+          bool is_different=false;
+          if (!(i < previous_string.length())) {
+            if(current_string[i] != previous_string[i]) {
+              is_different=true;
+            }
+          }
+          if (!is_different && false && 
+              (current_string[i] > 31 && current_string[i] < 33)) {
+            // skip this character
+            skip_length++;
+          } else {
+            if(skip_length) {
+              fixed_string += "\x1B[" + std::to_string(skip_length) + "C";
+              skip_length =0;
+            }
+            // take this character into account
+            fixed_string += current_string[i];
+          }
+        }
+        std::cout << HIDE_CURSOR << fixed_string << set_cursor_position << std::flush;
+      } 
+      else {
+        std::cout << HIDE_CURSOR << ToString() << set_cursor_position << std::flush;
+      }
+      previous_string = ToString();
+
       Clear();
     }
     Event event;
@@ -329,7 +367,6 @@ void ScreenInteractive::Draw(Component* component) {
 
   int dx = dimx_ - 1 - cursor_.x;
   int dy = dimy_ - 1 - cursor_.y;
-
   if (dx != 0) {
     set_cursor_position += "\x1B[" + std::to_string(dx) + "D";
     reset_cursor_position += "\x1B[" + std::to_string(dx) + "C";
