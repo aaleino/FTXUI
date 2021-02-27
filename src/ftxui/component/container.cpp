@@ -58,21 +58,36 @@ void Container::SetActiveChild(Component* child) {
 
 bool Container::VerticalEvent(Event event) {
   int old_selected = selected_;
-  if (event == Event::ArrowUp || event == Event::Character('k'))
+  bool direction_up = true; // [AL]
+  if (event == Event::ArrowUp || event == Event::Character('k')) {
     selected_--;
+    direction_up=false;
+  }
   if (event == Event::ArrowDown || event == Event::Character('j'))
     selected_++;
+
   if (event == Event::Tab && children_.size())
     selected_ = (selected_ + 1) % children_.size();
   if (event == Event::TabReverse && children_.size())
     selected_ = (selected_ + children_.size() - 1) % children_.size();
 
   selected_ = std::max(0, std::min(int(children_.size()) - 1, selected_));
+
+
+  do {
+    if(!children_[selected_]->focusable) {
+      if(!direction_up)selected_++;
+      else selected_--;
+    }
+    selected_ = selected_ % (children_.size());
+  } while(!children_[selected_]->focusable);
+
   return old_selected != selected_;
 }
 
 bool Container::HorizontalEvent(Event event) {
   int old_selected = selected_;
+
   if (event == Event::ArrowLeft || event == Event::Character('h'))
     selected_--;
   if (event == Event::ArrowRight || event == Event::Character('l'))

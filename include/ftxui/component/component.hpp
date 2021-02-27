@@ -51,6 +51,8 @@ class Component {
   // Configure all the ancestors to give focus to this component.
   void TakeFocus();
 
+  bool focusable = true; // [AL] edit
+
  private:
   Component* parent_ = nullptr;
   void Detach();
